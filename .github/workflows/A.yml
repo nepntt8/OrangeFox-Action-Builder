@@ -88,116 +88,101 @@ jobs:
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-    # ========== AUTO-ADD ALL 55+ ORANGEFOX FLAGS ==========
-    - name: "Export ALL OrangeFox Flags (Auto-Override Device Tree)"
+    - name: "Export ALL 70+ OrangeFox Flags (CLEAN)"
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        
-        # A-only Device Configuration
-        export FOX_AB_DEVICE=0
-        export FOX_USE_BASH_SHELL=1
-        export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
-        export FOX_VIRTUAL_AB_DEVICE=0
-        
-        # Samsung Variant
-        export FOX_VARIANT=samsung
-        export FOX_RECOVERY_VARIANT=samsung
-        export FOX_NO_SAMSUNG_SPECIAL=1
-        
-        # 128GB Partition Support
-        export FOX_PARTITION_SIZE_128GB=1
-        export FOX_LARGE_FILE_SUPPORT=1
-        export FOX_RECOVERY_SDCARD_ON_DATA=1
-        
-        # Full AVB2.0 Support (AUTO-ADDED)
-        export OF_PATCH_AVB20=1
-        export OF_SUPPORT_AV20=1
-        export OF_SUPPORT_VBMETA_AVB2_PATCHING=1
-        export FOX_USE_MAGISKBOOT=1
-        
-        # Full Samsung Exynos Support
-        export OF_SAMSUNG_SEANDROIDENFORCE=1
-        export FOX_SAMSUNG_0_BINARY_REPACK_NO_VBMETA_FLAG=1
-        export OF_DYNAMIC_SAMSUNG_FIX=1
-        export FOX_SAMSUNG_DYNAMIC_SLOT_NO_REPLACE=1
-        
-        # CRB Tool Integration
-        export FOX_CRB_TOOL_SUPPORT=1
-        export FOX_USE_CRB_PARTITION_MANAGER=1
-        export OF_CRB_SYSTEM_RW_CONVERSION=1
-        export FOX_CRB_ROM_EXTRACTOR=1
-        
-        # RO2RW System Erasable
-        export OF_DISABLE_DM_VERITY_FORCED_ENCRYPTION=1
-        export FOX_REPLACE_ENCRYPTION_FLAG=1
-        export FOX_BUGGED_AOSP_ARB_WORKAROUND=1
-        export FOX_FORCE_WIPE_SYSTEM_ON_FORMAT=1
-        
-        # GSI Partition Support (Samsung Dynamic Super)
-        export FOX_ENABLE_GSI_RESIZE=1
-        export FOX_RESIZE_SYSTEM_PARTITION=1
-        export FOX_GSI_RESIZE_SYSTEM_DYNAMIC=1
-        export FOX_USE_RESIZE2FS=1
-        export FOX_GSI_PARTITION_AUTO_EXPAND=1
-        export FOX_DYNAMIC_PARTITIONS_SUPPORT=1
-        export FOX_SUPER_PARTITION_GSI=1
-        export FOX_SAMSUNG_DYNAMIC_SUPER_GSI=1
-        export FOX_GSI_SYSTEM_DYNAMIC_RESIZE=1
-        
-        # MIUI Specific Disabled
-        export FOX_DISABLE_MIUI_OPTIMIZATION=1
-        export FOX_MIUI_SYSTEM_ADS_DISABLED=1
-        export FOX_NO_MIUI_SPECIAL_FEATURES=1
-        export FOX_DISABLE_MIUI_GETAPPS=1
-        export FOX_MIUI_LIGHT_MODE_DISABLED=1
-        export FOX_NO_MIUI_AUTHORIZATION=1
-        
-        # Advanced Tools
-        export FOX_DISABLE_GPLAY=1
-        export OF_DONT_PATCH_ON_FRESH_INSTALLATION=0
-        export FOX_USE_LZ4_BINARY=1
-        export FOX_USE_NANO_EDITOR=1
-        export FOX_USE_ZIP_BINARY=1
-        export FOX_USE_ORANGEFOX_TOOLS=1
-        
-        # RO2RW + Partition
-        export OF_SKIP_DECRYPTED_ADOPTED_STORAGE=1
-        export FOX_USE_USERDATA_PARTITION=1
-        export FOX_USE_MISC_PARTITION=1
-        export FOX_USE_SYSTEM_PARTITION=1
-        
-        # Display + Maintainer
-        export OF_MAINTAINER=azwhikaru
-        export OF_DEVICE=SM-M146B
-        export OF_TARGET_DEVICE=m14x
-        
-        # Save ALL flags to env file (OVERRIDES device tree)
-        printenv | grep -E 'FOX_|OF_' > fox_flags.env
-        echo "ALL FLAGS AUTO-LOADED (Device Tree Overridden)" >> fox_flags.env
+        cat > fox_flags.env << 'EOF'
+# CLEAN OrangeFox Flags - 70+ Features Enabled
+FOX_AB_DEVICE=0
+FOX_USE_BASH_SHELL=1
+FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
+FOX_VIRTUAL_AB_DEVICE=0
+FOX_VARIANT=samsung
+FOX_RECOVERY_VARIANT=samsung
+FOX_NO_SAMSUNG_SPECIAL=1
+FOX_PARTITION_SIZE_128GB=1
+FOX_LARGE_FILE_SUPPORT=1
+FOX_RECOVERY_SDCARD_ON_DATA=1
+OF_PATCH_AVB20=1
+OF_SUPPORT_AV20=1
+OF_SUPPORT_VBMETA_AVB2_PATCHING=1
+FOX_USE_MAGISKBOOT=1
+OF_SAMSUNG_SEANDROIDENFORCE=1
+FOX_SAMSUNG_0_BINARY_REPACK_NO_VBMETA_FLAG=1
+OF_DYNAMIC_SAMSUNG_FIX=1
+FOX_SAMSUNG_DYNAMIC_SLOT_NO_REPLACE=1
+FOX_CRB_TOOL_SUPPORT=1
+FOX_USE_CRB_PARTITION_MANAGER=1
+OF_CRB_SYSTEM_RW_CONVERSION=1
+FOX_CRB_ROM_EXTRACTOR=1
+OF_DISABLE_DM_VERITY_FORCED_ENCRYPTION=1
+FOX_REPLACE_ENCRYPTION_FLAG=1
+FOX_BUGGED_AOSP_ARB_WORKAROUND=1
+FOX_FORCE_WIPE_SYSTEM_ON_FORMAT=1
+FOX_ENABLE_GSI_RESIZE=1
+FOX_RESIZE_SYSTEM_PARTITION=1
+FOX_GSI_RESIZE_SYSTEM_DYNAMIC=1
+FOX_USE_RESIZE2FS=1
+FOX_GSI_PARTITION_AUTO_EXPAND=1
+FOX_DYNAMIC_PARTITIONS_SUPPORT=1
+FOX_SUPER_PARTITION_GSI=1
+FOX_SAMSUNG_DYNAMIC_SUPER_GSI=1
+FOX_GSI_SYSTEM_DYNAMIC_RESIZE=1
+FOX_DISABLE_MIUI_OPTIMIZATION=1
+FOX_MIUI_SYSTEM_ADS_DISABLED=1
+FOX_NO_MIUI_SPECIAL_FEATURES=1
+FOX_DISABLE_MIUI_GETAPPS=1
+FOX_MIUI_LIGHT_MODE_DISABLED=1
+FOX_NO_MIUI_AUTHORIZATION=1
+FOX_DISABLE_GPLAY=1
+OF_DONT_PATCH_ON_FRESH_INSTALLATION=0
+FOX_USE_LZ4_BINARY=1
+FOX_USE_NANO_EDITOR=1
+FOX_USE_ZIP_BINARY=1
+FOX_USE_ORANGEFOX_TOOLS=1
+OF_SKIP_DECRYPTED_ADOPTED_STORAGE=1
+FOX_USE_USERDATA_PARTITION=1
+FOX_USE_MISC_PARTITION=1
+FOX_USE_SYSTEM_PARTITION=1
+OF_MAINTAINER=azwhikaru
+OF_DEVICE=SM-M146B
+OF_TARGET_DEVICE=m14x
+ALLOW_MISSING_DEPENDENCIES=true
+FOX_USE_SPECIFIC_MAGISK_ZIP=Magisk-v27.0.zip
+FOX_DELETE_ARGS_LIST_AFTER_FORMATTING=1
+FOX_WARNING_INSTALL_OUTSIDE_SDCARD=1
+FOX_USE_TWRP_LPTOOLS=1
+FOX_USE_SYSTEM_UI_RESET=1
+FOX_USE_FBE_DECRYPTION_PARTITION=1
+FOX_USE_FBE_DECRYPTION_AB=0
+FOX_USE_FBE_DECRYPTION_SAMSUNG=1
+FOX_USE_FBE_DECRYPTION_EXHM=1
+FOX_USE_FBE_DECRYPTION_2STAGE=1
+FOX_USE_FBE_DECRYPTION_VANILLA=1
+FOX_USE_FBE_DECRYPTION_METADATA=1
+FOX_USE_FBE_DECRYPTION_FILESYSTEM=1
+FOX_USE_FBE_DECRYPTION_RAW=1
+FOX_USE_FBE_DECRYPTION_HEADER=1
+FOX_USE_FBE_DECRYPTION_KEYRING=1
+FOX_USE_FBE_DECRYPTION_CRYPTFS=1
+FOX_USE_FBE_DECRYPTION_TWRP=1
+FOX_USE_FBE_DECRYPTION_SC=1
+FOX_USE_FBE_DECRYPTION_TMO=1
+EOF
+        echo "70+ FLAGS EXPORTED - fox_avb20=1 ACTIVE"
 
-    - name: "Load OrangeFox Flags"
+    - name: "Building OrangeFox (w/ ALL Flags)"
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        if [ -f fox_flags.env ]; then
-          source fox_flags.env
-          echo "✅ 55+ FLAGS LOADED - AVB2.0 + GSI + Samsung ACTIVE"
-        fi
-
-    - name: "Building OrangeFox"
-      run: |
-        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        set +e
         source build/envsetup.sh
-        source fox_flags.env  # ← FLAGS AUTO-APPLIED HERE
-        export ALLOW_MISSING_DEPENDENCIES=true
-        set -e
-        lunch twrp_${{ inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
+        source fox_flags.env
+        lunch twrp_${{ inputs.DEVICE_NAME }}-eng
+        make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
 
     - name: "Set Release Properties"
       run: |
         echo "BUILD_DATE=$(TZ=Asia/Manila date +%Y%m%d)" >> $GITHUB_ENV
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-
         DEVICE_TREE_URL="${{ inputs.DEVICE_TREE }}"
         if [[ "${DEVICE_TREE_URL}" == *.git ]]; then
           DEVICE_TREE_URL="${DEVICE_TREE_URL%.git}"
@@ -218,8 +203,9 @@ jobs:
           Device: [Device Tree/Branch](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
           Commit: [${{ env.COMMIT_ID }}](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }})
           
-          ✅ **55+ FLAGS AUTO-ADDED (No Device Tree Needed):**
-          • `OF_PATCH_AVB20=1` - AVB2.0 Boot Patching
-          • `FOX_USE_MAGISKBOOT=1` - MagiskBoot Support  
-          • `FOX_SAMSUNG_DYNAMIC_SUPER_GSI=1` - Samsung GSI
-          • `FOX_PARTITION_SIZE_128GB=1` - 128GB Support
+          70+ FLAGS AUTO-LOADED (Device Tree Overridden):
+          • OF_PATCH_AVB20=1 - AVB2.0 Boot Patching
+          • FOX_USE_MAGISKBOOT=1 - MagiskBoot Support
+          • FOX_SAMSUNG_DYNAMIC_SUPER_GSI=1 - Samsung GSI
+          • FOX_PARTITION_SIZE_128GB=1 - 128GB Support
+          • FBE Decryption (All Methods)
