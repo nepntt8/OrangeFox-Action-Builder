@@ -43,7 +43,7 @@ on:
         - recovery
         - vendorboot
       GSI_MODE:
-        description: 'GSI Mode'
+        description: ''
         required: false
         default: 'a-only'
         type: choice
@@ -52,7 +52,7 @@ on:
         - a-b
         - standard
       ODIN_AVB_PATCH:
-        description: 'Odin AVB Patch (Disable all verity/verification)'
+        description: ''
         required: false
         default: 'true'
         type: boolean
@@ -102,7 +102,7 @@ jobs:
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-    - name: GSI + Odin AVB Check
+    - name: 
       if: inputs.GSI_MODE != 'standard' || inputs.ODIN_AVB_PATCH == 'true'
       run: |
         echo "GSI + Odin AVB Patch Check"
