@@ -1,4 +1,4 @@
-name: OrangeFox - Build (A-Only GSI + Odin AVB Patch)
+name: OrangeFox A-Only GSI + Odin AVB
 
 # Credits to:
 # https://github.com/TeamWin
@@ -119,6 +119,11 @@ jobs:
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
         
+        # Export variables for shell access
+        export GSI_MODE="${{ inputs.GSI_MODE || 'a-only' }}"
+        export ODIN_AVB_PATCH="${{ inputs.ODIN_AVB_PATCH }}"
+        export DEVICE_NAME="${{ inputs.DEVICE_NAME }}"
+        
         cat > vendorsetup.sh << 'EOF'
 #!/bin/bash
         
@@ -143,7 +148,7 @@ export FOX_USE_ZIP_BINARY=1
 EOF
 
         # GSI Mode specific
-        if [ "${GSI_MODE}" == "a-only" ]; then
+        if [ "$GSI_MODE" == "a-only" ]; then
           cat >> vendorsetup.sh << 'EOF'
 export BOARD_BUILD_SYSTEM_ROOT_IMAGE_PARTITION_A=1
 export FOX_PARTITION_SIZE_SYSTEM=67108864
@@ -151,7 +156,7 @@ export FOX_PARTITION_SIZE_VENDOR=50331648
 export OF_FLASH_ALL_PARTITIONS=1
 export OF_UNION_SYSTEM=1
 EOF
-        elif [ "${GSI_MODE}" == "a-b" ]; then
+        elif [ "$GSI_MODE" == "a-b" ]; then
           cat >> vendorsetup.sh << 'EOF'
 export FOX_AB_DEVICE=1
 export OF_AVB=1
@@ -159,11 +164,9 @@ EOF
         fi
 
         # ODIN AVB PATCH - Full disable (vbmeta --disable-verity --disable-verification equivalent)
-        if [ "${ODIN_AVB_PATCH}" == "true" ]; then
+        if [ "$ODIN_AVB_PATCH" == "true" ]; then
           cat >> vendorsetup.sh << 'EOF'
-# ========================================
 # ODIN AVB PATCH - Disable ALL Verification
-# ========================================
 export OF_PATCH_AVB20=1
 export OF_SUPPORT_VBMETA_AVB2_PATCHING=1
 export OF_DISABLE_AVBMETA=1
@@ -182,15 +185,11 @@ EOF
         fi
         
         chmod +x vendorsetup.sh
-        echo "Generated vendorsetup.sh with $(grep -c '^export' vendorsetup.sh) flags (Odin AVB: ${{ inputs.ODIN_AVB_PATCH }})"
+        echo "Generated vendorsetup.sh with $(grep -c '^export' vendorsetup.sh) flags (Odin AVB: $ODIN_AVB_PATCH)"
 
     - name: Building OrangeFox A-Only GSI + Odin AVB
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        export GSI_MODE=${{ inputs.GSI_MODE || 'a-only' }}
-        export DEVICE_NAME=${{ inputs.DEVICE_NAME }}
-        export ODIN_AVB_PATCH=${{ inputs.ODIN_AVB_PATCH }}
-        
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL="C"
         export FOX_BUILD_DEVICE=${{ inputs.DEVICE_NAME }}
