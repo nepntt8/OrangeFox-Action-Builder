@@ -1,8 +1,7 @@
-# OrangeFox - Build (FULL Auto-Flags)
 # Credits to:
-# https://github.com/TeamWin [attached_file:1]
+# https://github.com/TeamWin
 # https://gitlab.com/OrangeFox
-# https://github.com/azwhikaru for Recovery Builder Template [attached_file:2]
+# https://github.com/azwhikaru for Recovery Builder Template
 # And all Contributors in every repositories I used
 
 name: OrangeFox - Build
@@ -21,7 +20,7 @@ on:
       DEVICE_TREE:
         description: 'OrangeFox Device Tree'
         required: true
-        default: 'https://github.com/neepnttt9/android_device_samsung_m14x.git'
+        default: 'https://github.com/cd-Crypton/custom_recovery_tree_realme_nashc'
       DEVICE_TREE_BRANCH:
         description: 'OrangeFox Device Tree Branch'
         required: true
@@ -29,11 +28,11 @@ on:
       DEVICE_PATH:
         description: 'Specify your Device Path'
         required: true
-        default: 'device/samsung/m14x'
+        default: 'device/realme/nashc'
       DEVICE_NAME:
         description: 'Specify your Device Codename'
         required: true
-        default: 'm14x'
+        default: 'nashc'
       BUILD_TARGET:
         description: 'Specify your Build Target'
         required: true
@@ -89,104 +88,69 @@ jobs:
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-    - name: 🚀 Auto-Add ALL OrangeFox Flags (Samsung/Treble/ro2rw/Terminal)
+    - name: Add ALL A-Only OrangeFox Flags
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
-        
-        # Download OrangeFox Flags
-        git clone https://github.com/kinguser981/OrangeFox-Recovery-Flags.git flags_temp
-        cp flags_temp/OrangeFox-Recovery-Flags.mk .
-        rm -rf flags_temp
-        
-        # Auto-create AndroidProducts.mk
-        cat > AndroidProducts.mk << EOF
-PRODUCT_MAKEFILES := \\
-    $(LOCAL_PATH)/fox_${{ inputs.DEVICE_NAME }}.mk
-EOF
-        
-        # FULL OrangeFox flags (ALL features)
-        cat > fox_${{ inputs.DEVICE_NAME }}.mk << EOF
-$(call inherit-product, $(DEVICE_PATH)/OrangeFox-Recovery-Flags.mk)
+        cp BoardConfig.mk BoardConfig.mk.backup
+        cat >> BoardConfig.mk << 'EOF'
 
-# ================================================
-# SYSTEM ro2rw + ERASABLE (Samsung Super)
-# ================================================
-OF_SYSTEM_IS_READWRITE := true
-FOX_SYSTEM_IS_READONLY := false
-OF_RO2RW := true
-OF_SUPPORTS_RO2RW := true
-FOX_ENABLE_RO2RW := true
-BOARD_SAMSUNG_DYNAMIC_PARTITIONS := true
-OF_EROFS_SUPPORT := true
-OF_CREATE_RO2RW_SUPER := true
+# ========================================
+# FULL NON-VANILLA ORANGEFOX - A-ONLY FLAGS
+# ========================================
+# AVB & Security (Prevents stock recovery overwrite)
+OF_PATCH_AVB20 := 1
+OF_SUPPORT_VBMETA_AVB2_PATCHING := 1
+OF_ADVANCED_SECURITY_PATCH := 1
 
-# ================================================
-# TREBLE GSI CHECKER
-# ================================================
-FOX_TREBLE_CHECKER := true
-FOX_TREBLE_AUTO_INSTALL_GSI := true
-FOX_TREBLE_FORCE_SELECT_VENDOR := true
+# A-Only Partition Detection (CRITICAL)
+FOX_AB_DEVICE := 0
+FOX_VIRTUAL_AB_DEVICE := 0
+OF_AB_DEVICE_WITH_RECOVERY_PARTITION := 0
+FOX_RECOVERY_INSTALL_PARTITION := /dev/block/by-name/recovery
+TW_RECOVERY_PARTITION := "recovery"
 
-# ================================================
-# TERMINAL (Full Linux Shell)
-# ================================================
+# Filesystem Support (Full)
+TW_INCLUDE_NTFS_3G := true
+TW_INCLUDE_FUSE_EXFAT := true
+TW_INCLUDE_FUSE_NTFS := true
+TW_ENABLE_ALL_PARTITION_TOOLS := true
+
+# Display & UI Enhancements
+TW_USE_NEW_MINUI := true
+TW_THEME := PIT
+TW_DEFAULT_BRIGHTNESS := "80"
+OF_SCREENSHOT_MODE := 1
+OF_HIDE_NOTCH := 1
+OF_CLOCK_POS := 1
+OF_STATUS_INDENT_LEFT := 105
+OF_FBE_OFFSET := 102400
+
+# Hardware Features
+OF_FLASHLIGHT_ENABLE := 1
+OF_FL_PATH1 := "/sys/class/leds/flashlight"
+OF_MIUI_OPT := true
+OF_DISABLE_MIUI_SPECIFIC_FEATURES := false
+
+# Tools & Debugging
+TW_INCLUDE_LOGCAT := true
+FOX_USE_BASH_SHELL := true
 FOX_USE_NANO_EDITOR := 1
-FOX_USE_GREP_BINARY := 1
-FOX_USE_SED_BINARY := 1
-FOX_USE_AWK_BINARY := 1
-FOX_USE_BASH_SHELL := 1
-FOX_USE_ZIP_BINARY := 1
-FOX_USE_TAR_BINARY := 1
+FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER := 1
 
-# ================================================
-# SAMSUNG AVB + CRB + ODIN
-# ================================================
-FOX_VARIANT := samsung
-OF_USE_MAGISKBOOT := 1
-BOARD_USES_RECOVERY_AS_BOOT := true
-BOARD_MOVE_RECOVERY_RESOURCES_TO_BOOT := true
-OF_CREATE_ODIN_TAR := true
-OF_SAMSUNG_DEVICE := 1
-AVB_ENABLE_RECOVERY_PATH := 1
-
-# OrangeFox Settings
-FOX_VERSION := R11.1_1_0_0-Ultimate
-OF_MAINTAINER := ${{ github.actor }}
-FOX_BUILD_TYPE := Unofficial-Ultimate
-FOX_RECOVERY_INSTALLER := true
-
-$(call inherit-product, $(DEVICE_PATH)/device.mk)
+# Optimizations
+TW_NO_RECRYPT_ENABLE := true
+ALLOW_MISSING_DEPENDENCIES := true
 EOF
-        
-        # Treble fstab
-        cat > recovery_root.fstab << EOF
-/dev/block/bootdevice/by-name/boot    /boot    emmc    defaults
-/dev/block/bootdevice/by-name/system  /system  ext4    defaults
-/dev/block/bootdevice/by-name/vendor  /vendor  ext4    defaults
-/dev/block/bootdevice/by-name/userdata /data    ext4    defaults,encryptable=userdata
-/dev/block/bootdevice/by-name/cache   /cache   ext4    defaults
-EOF
-        
-        # Samsung BoardConfig patches
-        cat >> BoardConfig.mk << EOF
-
-# Ultimate Samsung Flags
-BOARD_USES_RECOVERY_AS_BOOT := true
-BOARD_SAMSUNG_DYNAMIC_PARTITIONS := true
-BOARD_SUPER_PARTITION_SIZE := 9126805504
-OF_SYSTEM_IS_READWRITE := true
-EOF
-        
-        mkdir -p security
-        echo "✅ ALL FLAGS ADDED: ro2rw/Treble/Terminal/Samsung/AVB!"
+        echo "✅ Added ALL 25+ A-only OrangeFox flags!"
 
     - name: Building OrangeFox
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+        set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch fox_${{ inputs.DEVICE_NAME }}-eng
-        make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
+        set -e
+        lunch twrp_${{ inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
 
     - name: Set Release Properties
       run: |
@@ -204,24 +168,12 @@ EOF
       with:
         files: |
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.img
-          OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.tar
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.zip
-        name: OrangeFox R11.1 Ultimate for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
+        name: OrangeFox Recovery for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
         tag_name: ${{ github.run_id }}
         body: |
-          ## 🚀 OrangeFox Recovery ULTIMATE Build
-          **Build:** fox_${{ inputs.MANIFEST_BRANCH }}
-          **Device:** [${{ inputs.DEVICE_NAME }}](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
-          **Commit:** [${{ env.COMMIT_ID }}](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }})
-          
-          ✅ **ALL FLAGS AUTO-ADDED:**
-          • System ro2rw + Erasable Super
-          • Treble GSI Checker
-          • Full Terminal (nano/grep/sed/bash)
-          • Samsung AVB/CRB/Odin .tar
-          • Magiskboot + Recovery-as-Boot
-          
-          **Files:**
-          • `.img` → Fastboot/Odin AP
-          • `.tar` → Odin ready
-          • `.zip` → Magisk/Recovery
+          ## OrangeFox Recovery Build - Unofficial (FULL NON-VANILLA)
+          Build: fox_${{ inputs.MANIFEST_BRANCH }}
+          Device: [Device Tree/Branch](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
+          Commit: Most recent [commit](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }}) during building.
+          ✅ **ALL 25+ A-only flags enabled** (AVB, Flashlight, NTFS, MiUI OTA, etc.)
