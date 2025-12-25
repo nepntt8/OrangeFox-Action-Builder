@@ -4,6 +4,7 @@ name: OrangeFox - Build
 # https://github.com/TeamWin
 # https://gitlab.com/OrangeFox
 # https://github.com/azwhikaru for Recovery Builder Template
+# https://github.com/kinguser981/OrangeFox-Recovery-Flags
 # And all Contributors in every repositories I used
 
 on:
@@ -33,6 +34,10 @@ on:
         description: 'Specify your Device Codename'
         required: true
         default: 'm14x'
+      DEVICE_MAKEFILE:
+        description: 'Device Makefile Name (fox_m14x.mk)'
+        required: true
+        default: 'fox_m14x'
       BUILD_TARGET:
         description: 'Specify your Build Target'
         required: true
@@ -61,11 +66,12 @@ jobs:
     - name: Swap Space
       uses: pierotofy/set-swap-space@master
       with:
-        swap-size-gb: 24
+        swap-size-gb: 32
       
     - name: Build Environment
       run: |
-        sudo apt install aria2 -y
+        sudo apt update
+        sudo apt install aria2 bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev -y
         git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master
         cd scripts
         sudo bash setup/android_build_env.sh
@@ -81,6 +87,13 @@ jobs:
         cd sync
         ./orangefox_sync.sh --branch ${{ inputs.MANIFEST_BRANCH }} --path ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
 
+    - name: Download OrangeFox Flags
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
+        git clone https://github.com/kinguser981/OrangeFox-Recovery-Flags.git flags_temp
+        cp flags_temp/OrangeFox-Recovery-Flags.mk .
+        rm -rf flags_temp
+
     - name: Clone Device Tree
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
@@ -88,18 +101,57 @@ jobs:
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
+    - name: Create OrangeFox Device Makefile
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
+        cat > ${{ inputs.DEVICE_MAKEFILE }}.mk << EOF
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_arm64.mk)
+        
+        PRODUCT_DEVICE := ${{ inputs.DEVICE_NAME }}
+        PRODUCT_BRAND := samsung
+        PRODUCT_NAME := ${{ inputs.DEVICE_MAKEFILE }}
+        PRODUCT_MODEL := SM-M146B
+        PRODUCT_MANUFACTURER := samsung
+        
+        $(call inherit-product, device/samsung/${{ inputs.DEVICE_NAME }}/device.mk)
+        $(call inherit-product, ./OrangeFox-Recovery-Flags.mk)
+        EOF
+
+    - name: Setup AndroidProducts & Create Fox File
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
+        cat > AndroidProducts.mk << EOF
+        PRODUCT_MAKEFILES := \\
+            $(LOCAL_DIR)/${{ inputs.DEVICE_MAKEFILE }}.mk
+        EOF
+        mkdir -p fox_${{ inputs.DEVICE_NAME }}
+        cat > fox_${{ inputs.DEVICE_NAME }}.mk << EOF
+        PRODUCT_NAME := fox_${{ inputs.DEVICE_NAME }}
+        PRODUCT_DEVICE := ${{ inputs.DEVICE_NAME }}
+        PRODUCT_BRAND := OrangeFox
+        PRODUCT_MODEL := OrangeFox Recovery Project
+        PRODUCT_MANUFACTURER := OrangeFox
+        
+        PRODUCT_PACKAGES += \\
+            FoxTheme
+        EOF
+
     - name: Building OrangeFox
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        set +e
-        source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        set -e
-        lunch twrp_${{ inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
+        export LC_ALL=C.UTF-8
+        export KBUILD_BUILD_USER=OrangeFox
+        export KBUILD_BUILD_HOST=GitHubActions
+        source build/envsetup.sh
+        lunch ${{ inputs.DEVICE_MAKEFILE }}_${{ inputs.DEVICE_NAME }}-eng
+        make clean && make -j$(nproc) ${{ inputs.BUILD_TARGET }}image
 
     - name: Set Release Properties
       run: |
-        echo "BUILD_DATE=$(TZ=Asia/Manila date +%Y%m%d)" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(TZ=Asia/Manila date +%Y%m%d-%H%M)" >> $GITHUB_ENV
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
 
         DEVICE_TREE_URL="${{ inputs.DEVICE_TREE }}"
@@ -108,17 +160,46 @@ jobs:
         fi
         echo "DEVICE_TREE_URL=${DEVICE_TREE_URL}" >> $GITHUB_ENV
 
+    - name: Rename & Upload Artifacts
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}
+        BUILD_NAME="OrangeFox_R${{ inputs.MANIFEST_BRANCH | replace('_', '.') }}_${{ inputs.DEVICE_NAME }}_${{ env.BUILD_DATE }}"
+        
+        for file in *.img *.zip *.tar; do
+          if [ -f "$file" ]; then
+            mv "$file" "${BUILD_NAME}_${file}"
+          fi
+        done
+        
+        ls -la *.img *.zip *.tar
+
     - name: Upload to Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.img
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.zip
-        name: OrangeFox Recovery for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
+          OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.tar
+        name: OrangeFox Recovery R${{ inputs.MANIFEST_BRANCH | replace('_', '.') }} for ${{ inputs.DEVICE_NAME }} // ${{ env.BUILD_DATE }}
         tag_name: ${{ github.run_id }}
         body: |
-          ## OrangeFox Recovery Build - Unofficial
-          Build: fox_${{ inputs.MANIFEST_BRANCH }}
-          Device: [Device Tree/Branch](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
-          Commit: Most recent [commit](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }}) during building.
+          OrangeFox Recovery Build - Unofficial
           
+          Build: fox_${{ inputs.MANIFEST_BRANCH }}  
+          Device: [${{ inputs.DEVICE_NAME }} Device Tree](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }}) [${{ env.COMMIT_ID[:7] }}]
+          Date: ${{ env.BUILD_DATE }}
+          Runner: ${{ github.actor }} / [${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}]
+          
+          Downloads:
+          - Recovery Image (Flash via Odin/Heimdall)
+          - Recovery ZIP (Flash via TWRP/Stock Recovery)
+          - Recovery TAR (Samsung Odin format)
+          
+          Features (from Flags):
+          - Magiskboot patching
+          - MIUI/Flyme OTA support  
+          - AromaFM installer
+          - Material Design UI
+          - 100+ OrangeFox features
+          
+          Built with OrangeFox Flags repo
