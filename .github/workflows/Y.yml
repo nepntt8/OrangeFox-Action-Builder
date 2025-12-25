@@ -1,4 +1,4 @@
-name: OrangeFox A-Only GSI + Odin AVB
+name: OrangeFox
 
 # Credits to:
 # https://github.com/TeamWin
@@ -43,7 +43,7 @@ on:
         - recovery
         - vendorboot
       GSI_MODE:
-        description: 'GSI Mode (A-Only optimized)'
+        description: 'GSI Mode'
         required: false
         default: 'a-only'
         type: choice
