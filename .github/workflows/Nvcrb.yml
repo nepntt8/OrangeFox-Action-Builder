@@ -2,6 +2,7 @@
 # https://github.com/TeamWin
 # https://gitlab.com/OrangeFox  
 # https://github.com/azwhikaru for Recovery Builder Template
+# https://github.com/TeamWin/android_build
 # And all Contributors in every repositories I used
 
 name: OrangeFox - Buildnvcrb
@@ -69,15 +70,28 @@ jobs:
 
     - name: Build Environment
       run: |
-        sudo apt update && sudo apt install aria2 -y
-        rm -rf scripts
-        git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master
-        cd scripts
-        sudo bash setup/android_build_env.sh
+        echo "::group::📦 Installing Build Dependencies"
+        sudo apt update && sudo apt install -y \
+          aria2 bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg \
+          gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool \
+          libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
+          schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python3-pip
+        
+        pip3 install ccache
+        echo "::endgroup::"
+
+    - name: Clone Build Tools
+      run: |
+        echo "::group::🔧 Cloning Essential Build Tools"
+        rm -rf scripts build_tools
+        git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master scripts
+        git clone https://github.com/TeamWin/android_build.git -b fox_12.1 build_tools
+        echo "::endgroup::"
 
     - name: Set-up Manifest
       if: contains(fromJSON('["11.0", "12.1"]'), inputs.MANIFEST_BRANCH)
       run: |
+        echo "::group::📥 Syncing OrangeFox Sources"
         mkdir -p ${GITHUB_WORKSPACE}/OrangeFox
         cd ${GITHUB_WORKSPACE}/OrangeFox
         git config --global user.name "${{ github.actor }}"
@@ -85,13 +99,16 @@ jobs:
         git clone https://gitlab.com/OrangeFox/sync.git -b master
         cd sync
         ./orangefox_sync.sh --branch ${{ inputs.MANIFEST_BRANCH }} --path ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+        echo "::endgroup::"
 
     - name: Clone Device Tree
       run: |
+        echo "::group::📱 Cloning Device Tree"
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
         git clone ${{ inputs.DEVICE_TREE }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ inputs.DEVICE_PATH }}
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
+        echo "::endgroup::"
 
     # 🔥 DEVICE TREE VALIDATION
     - name: Validate Device Tree
@@ -109,6 +126,7 @@ jobs:
     # 🔥 28 NON-VANILLA + TREBLE FLAGS (SAFER)
     - name: Inject NON-VANILLA+TREBLE Flags
       run: |
+        echo "::group::⚙️ Injecting NON-VANILLA Flags"
         BOARDCONFIG="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}/BoardConfig.mk"
         [[ -f "$BOARDCONFIG" ]] || { echo "❌ BoardConfig.mk not found!"; exit 1; }
         
@@ -137,6 +155,7 @@ jobs:
         echo "OF_CRYPTPOLICY := 1" >> "$BOARDCONFIG"
         echo "FOX_AB_DEVICE := 0" >> "$BOARDCONFIG"
         echo "OF_SUPPORT_MIUI_JMIUI_BOOTMODE := 1" >> "$BOARDCONFIG"
+        echo "::endgroup::"
 
     - name: Show NON-VANILLA Flags
       run: |
@@ -144,31 +163,51 @@ jobs:
         tail -25 "${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}/BoardConfig.mk"
         echo "::endgroup::"
 
-    # 🔥 SOONG BUILD (NO envsetup.sh + NO lunch needed)
+    - name: Debug Build Environment
+      run: |
+        echo "::group::🔍 DEBUG: Build Environment Check"
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+        echo "📁 Build tree check:"
+        ls -la build/make/core/main.mk || echo "❌ main.mk MISSING!"
+        ls -la build/envsetup.sh || echo "❌ envsetup.sh MISSING!"
+        find . -name "Android.mk" | head -5 || echo "❌ No Android.mk files!"
+        echo "📂 Device tree:"
+        ls -la ${{ inputs.DEVICE_PATH }}/
+        echo "::endgroup::"
+
+    # 🔥 PROPER ANDROID BUILD SETUP
     - name: Building OrangeFox NON-VANILLA
       timeout-minutes: 120
       continue-on-error: false
       run: |
+        echo "::group::🚀 ORANGEFOX FULL BUILD (PROPER SETUP)"
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
         
-        echo "::group::🚀 ORANGEFOX SOONG BUILD (OrangeFox 12.1)"
+        # 🔥 CRITICAL: Proper Android build environment setup
         export ALLOW_MISSING_DEPENDENCIES=true
+        export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache
+        ccache -M 50G
         
         echo "📱 Device: ${{ inputs.DEVICE_NAME }}"
         echo "📁 Path: ${{ inputs.DEVICE_PATH }}"
         echo "🎯 Target: ${{ inputs.BUILD_TARGET }}"
         
-        echo "::group::🔧 CLEAN BUILD"
-        make clean || make clobber || rm -rf out/ || true
+        echo "::group::🔧 ANDROID ENVIRONMENT SETUP"
+        source build/envsetup.sh
+        lunch twrp_${{ inputs.DEVICE_NAME }}-eng 2>/dev/null || lunch ${{ inputs.DEVICE_NAME }}-eng
         echo "::endgroup::"
         
-        echo "::group::🚀 SOONG BUILD"
-        time mka adbd ${{ inputs.BUILD_TARGET }}image || \
+        echo "::group::🧹 CLEAN BUILD"
+        make clean && make clobber
+        rm -rf out/ || true
+        echo "::endgroup::"
+        
+        echo "::group::🚀 MAIN BUILD"
+        time mka bacon ${{ inputs.BUILD_TARGET }}image || \
         time mka ${{ inputs.BUILD_TARGET }}image || \
-        time mka ${{ inputs.BUILD_TARGET }} || \
-        time make ${{ inputs.BUILD_TARGET }}image
+        time mka ${{ inputs.BUILD_TARGET }}
         echo "::endgroup::"
         
         echo "::group::📦 OUTPUT FILES"
@@ -240,5 +279,5 @@ jobs:
     - name: Cleanup
       if: always()
       run: |
-        rm -rf ${GITHUB_WORKSPACE}/OrangeFox scripts
+        rm -rf ${GITHUB_WORKSPACE}/OrangeFox scripts build_tools
         df -h
