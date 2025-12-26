@@ -96,6 +96,18 @@ jobs:
         git clone https://github.com/TeamWin/android_build.git build_tools
         echo "::endgroup::"
 
+    - name: Install repo tool
+      run: |
+        echo "::group::📦 Installing repo tool"
+        mkdir -p ~/.bin
+        PATH="${HOME}/.bin:${PATH}"
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+        chmod a+rx ~/.bin/repo
+        echo 'export PATH="${HOME}/.bin:${PATH}"' >> ~/.bashrc
+        source ~/.bashrc
+        repo --version
+        echo "::endgroup::"
+
     - name: Set-up Manifest
       if: contains(fromJSON('["11.0", "12.1"]'), inputs.MANIFEST_BRANCH)
       run: |
