@@ -4,7 +4,7 @@
 # https://github.com/azwhikaru for Recovery Builder Template
 # And all Contributors in every repositories I used
 
-name: OrangeFox - Build
+name: OrangeFox - Buildnvcrb
 
 on:
   workflow_dispatch:
