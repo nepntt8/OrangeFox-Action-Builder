@@ -1,0 +1,223 @@
+name: OrangeFox - Build
+
+# Credits to:
+# https://github.com/TeamWin
+# https://gitlab.com/OrangeFox  
+# https://github.com/azwhikaru for Recovery Builder Template
+# And all Contributors in every repositories I used
+
+on:
+  workflow_dispatch:
+    inputs:
+      MANIFEST_BRANCH:
+        description: 'OrangeFox Manifest Branch'
+        required: true
+        default: '12.1'
+        type: choice
+        options: [12.1, 11.0]
+      DEVICE_TREE:
+        description: 'OrangeFox Device Tree'
+        required: true
+        default: 'https://github.com/cd-Crypton/custom_recovery_tree_realme_nashc'
+      DEVICE_TREE_BRANCH:
+        description: 'OrangeFox Device Tree Branch'
+        required: true
+        default: 'android-12.1'
+      DEVICE_PATH:
+        description: 'Specify your Device Path'
+        required: true
+        default: 'device/realme/nashc'
+      DEVICE_NAME:
+        description: 'Specify your Device Codename'
+        required: true
+        default: 'nashc'
+      BUILD_TARGET:
+        description: 'Specify your Build Target'
+        required: true
+        default: 'recovery'
+        type: choice
+        options: [boot, recovery, vendorboot]
+
+jobs:
+  build:
+    name: Build OFR TREBLE by ${{ github.actor }}
+    runs-on: ubuntu-22.04
+    if: github.event.repository.owner.id == github.event.sender.id
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Display Inputs
+      run: |
+        echo "::group::User Environment Variables"
+        echo "Branch: ${{ inputs.MANIFEST_BRANCH }}"
+        echo "Device: ${{ inputs.DEVICE_NAME }}"
+        echo "Target: ${{ inputs.BUILD_TARGET }}"
+        echo "::endgroup::"
+
+    - name: Clean-up
+      uses: rokibhasansagar/slimhub_actions@main
+
+    - name: Swap Space
+      uses: pierotofy/set-swap-space@v2
+      with:
+        swap-size-gb: 24
+
+    - name: Build Environment
+      run: |
+        sudo apt update && sudo apt install aria2 -y
+        rm -rf scripts
+        git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master
+        cd scripts
+        sudo bash setup/android_build_env.sh
+
+    - name: Set-up Manifest
+      if: contains(fromJSON('["11.0", "12.1"]'), inputs.MANIFEST_BRANCH)
+      run: |
+        mkdir -p ${GITHUB_WORKSPACE}/OrangeFox
+        cd ${GITHUB_WORKSPACE}/OrangeFox
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+        git clone https://gitlab.com/OrangeFox/sync.git -b master
+        cd sync
+        ./orangefox_sync.sh --branch ${{ inputs.MANIFEST_BRANCH }} --path ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+
+    - name: Clone Device Tree
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+        git clone ${{ inputs.DEVICE_TREE }} -b ${{ inputs.DEVICE_TREE_BRANCH }} ./${{ inputs.DEVICE_PATH }}
+        cd ${{ inputs.DEVICE_PATH }}
+        echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+    # 🔥 TREBLE FLAGS (12 FLAGS)
+    - name: Inject TREBLE Flags
+      run: |
+        BOARDCONFIG="${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}/BoardConfig.mk"
+        echo "FOX_VANILLA_BUILD := 0" >> "$BOARDCONFIG"
+        echo "OF_TREBLE_CHECK_ON_REBOOT := 1" >> "$BOARDCONFIG"
+        echo "OF_SUPPORT_GSI_FLASHING := 1" >> "$BOARDCONFIG"
+        echo "OF_KEEP_GSI_PARTIALLY_DECRYPTED := 1" >> "$BOARDCONFIG"
+        echo "OF_GSI_MODE := 1" >> "$BOARDCONFIG"
+        echo "OF_NO_TREBLE_COMPATIBILITY_CHECK := 0" >> "$BOARDCONFIG"
+        echo "FOX_USE_NANO_EDITOR := 1" >> "$BOARDCONFIG"
+        echo "OF_USE_MAGISKBOOT := 1" >> "$BOARDCONFIG"
+        echo "OF_PATCH_AVB20 := 1" >> "$BOARDCONFIG"
+        echo "FOX_AB_DEVICE := 0" >> "$BOARDCONFIG"
+        echo "OF_USE_GREEN_LED := 1" >> "$BOARDCONFIG"
+        echo "OF_FIX_7ZIP_ZIP := 1" >> "$BOARDCONFIG"
+
+    - name: Show TREBLE Flags
+      run: |
+        echo "::group::✅ TREBLE FLAGS INJECTED (12 FLAGS)"
+        tail -15 "${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}/BoardConfig.mk"
+        echo "::endgroup::"
+
+    # 🔥 BUILD
+    - name: Building OrangeFox TREBLE
+      run: |
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+        source build/envsetup.sh
+        export ALLOW_MISSING_DEPENDENCIES=true
+        
+        if [[ "${{ inputs.MANIFEST_BRANCH }}" == "11.0" || "${{ inputs.MANIFEST_BRANCH }}" == "12.1" ]]; then
+          lunch twrp_${{ inputs.DEVICE_NAME }}-eng
+        else
+          lunch omni_${{ inputs.DEVICE_NAME }}-eng
+        fi
+        
+        make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
+
+    - name: Set Release Properties
+      run: |
+        echo "BUILD_DATE=$(TZ=Asia/Manila date +%Y%m%d)" >> $GITHUB_ENV
+        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
+
+        DEVICE_TREE_URL="${{ inputs.DEVICE_TREE }}"
+        if [[ "${DEVICE_TREE_URL}" == *.git ]]; then
+          DEVICE_TREE_URL="${DEVICE_TREE_URL%.git}"
+        fi
+        echo "DEVICE_TREE_URL=${DEVICE_TREE_URL}" >> $GITHUB_ENV
+        
+        # Find and verify images
+        ORANGEFOX_IMG=$(find out/target/product/${{ inputs.DEVICE_NAME }} -name "OrangeFox*.img" | head -1)
+        if [[ -n "$ORANGEFOX_IMG" ]]; then
+          echo "MD5_IMG=$(md5sum "$ORANGEFOX_IMG" | cut -d' ' -f1)" >> $GITHUB_ENV
+          echo "IMG_PATH=$(dirname "$ORANGEFOX_IMG")" >> $GITHUB_ENV
+        fi
+
+    # 🔥 IMAGE CHECK & RENAME
+    - name: Check & Rename Images
+      if: env.MD5_IMG != ''
+      run: |
+        cd "${{ env.IMG_PATH }}"
+        case "${{ inputs.BUILD_TARGET }}" in
+          "boot") mv OrangeFox*.img boot.img ;;
+          "recovery") mv OrangeFox*.img recovery.img ;;
+          "vendorboot") mv OrangeFox*.img vendor_boot.img ;;
+        esac
+        echo "RECOVERY_TYPE=$(echo ${{ inputs.BUILD_TARGET }} | sed 's/boot$/boot/;s/recovery$/recovery/;s/vendorboot$/vendor_boot/')" >> $GITHUB_ENV
+
+    # 🔥 PACKAGING
+    - name: Package Recovery Installer
+      if: env.MD5_IMG != '' && inputs.RECOVERY_INSTALLER == 'true'
+      run: |
+        cd "${{ env.IMG_PATH }}"
+        wget -q https://github.com/kinguser981/recovery-installer/releases/download/11256427880/recovery-installer.zip
+        zip -ur recovery-installer.zip ${{ env.RECOVERY_TYPE }}.img
+
+    # 🔥 RELEASE
+    - name: Upload to Release
+      if: env.MD5_IMG != ''
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ${{ env.IMG_PATH }}/*.img
+          ${{ env.IMG_PATH }}/*.zip
+          ${{ env.IMG_PATH }}/recovery-installer.zip
+        name: OrangeFox TREBLE [${{ inputs.DEVICE_NAME }}] - ${{ env.BUILD_DATE }}
+        tag_name: ${{ github.run_id }}
+        body: |
+          ## 🏗️ OrangeFox TREBLE Recovery Build
+          
+          **Build Info:**
+          - Date: ${{ env.BUILD_DATE }}
+          - Branch: fox_${{ inputs.MANIFEST_BRANCH }}
+          - Device: ${{ inputs.DEVICE_NAME }}
+          - Target: ${{ inputs.BUILD_TARGET }}
+          - Image MD5: `${{ env.MD5_IMG }}`
+          
+          **✅ TREBLE Features (12 FLAGS):**
+          - `OF_SUPPORT_GSI_FLASHING := 1`
+          - `OF_GSI_MODE := 1` 
+          - `OF_TREBLE_CHECK_ON_REBOOT := 1`
+          - GSI Install | AVB2.0 | MagiskBoot
+          
+          **Sources:**
+          - Device Tree: [${{ inputs.DEVICE_TREE }}](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
+          - Commit: [${{ env.COMMIT_ID }}](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }})
+          
+          > ⚠️ **Test thoroughly before flashing!**
+        prerelease: false
+        draft: false
+
+    # 🔥 LDCHECK
+    - name: Run LDCheck
+      if: env.MD5_IMG != ''
+      continue-on-error: true
+      run: |
+        mkdir -p tools && cd tools
+        wget -q https://github.com/orao/ldcheck/releases/download/v0.1/ldcheck-linux.zip || true
+        unzip -qo ldcheck-linux.zip 2>/dev/null || true
+        cd "${{ env.IMG_PATH }}"
+        python3 ../tools/ldcheck -p "system/lib64:vendor/lib64:system/lib:vendor/lib" -d system/bin/qseecomd
+
+    # 🔥 CLEANUP
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf ${GITHUB_WORKSPACE}/OrangeFox scripts
+        df -h
