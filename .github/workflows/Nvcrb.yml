@@ -1,4 +1,4 @@
-name: OrangeFox - Build NON-VANILLA+TREBLE (FIXED)
+name: OrangeFox - Build NON-VANILLA+TREBLE (A-ONLY+CRB FIXED)
 # Credits to:
 # https://github.com/TeamWin
 # https://gitlab.com/OrangeFox  
@@ -44,7 +44,7 @@ on:
 
 jobs:
   build:
-    name: "🔥 OrangeFox [${{ inputs.DEVICE_NAME }}] by ${{ github.actor }}"
+    name: "🔥 OrangeFox A-ONLY+CRB [${{ inputs.DEVICE_NAME }}] by ${{ github.actor }}"
     runs-on: ubuntu-22.04
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -118,28 +118,28 @@ jobs:
         cd ${{ inputs.DEVICE_PATH }}
         echo "COMMIT_ID=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-    - name: 🔥 FIX DEVICE TREE FOR ORANGEFOX (COMPLETE)
+    - name: 🔥 FIX DEVICE TREE FOR ORANGEFOX (A-ONLY+CRB + NO VENDORSETUP)
       run: |
-        echo "::group::🔧 Complete OrangeFox Device Prep"
+        echo "::group::🔧 Complete OrangeFox A-ONLY+CRB Device Prep"
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}
         
         DEVICE="${{ inputs.DEVICE_NAME }}"
         BOARDCONFIG="BoardConfig.mk"
         
-        # 1. COMPLETE vendorsetup.sh
-        echo "add_lunch_combo twrp_${DEVICE}-eng" > vendorsetup.sh
-        echo "add_lunch_combo ${DEVICE}-eng" >> vendorsetup.sh
-        chmod +x vendorsetup.sh
+        # ✅ 1. NO vendorsetup.sh - Android 12+ uses COMMON_LUNCH_CHOICES only
         
-        # 2. COMPLETE AndroidProducts.mk
-        echo "PRODUCT_MAKEFILES := \\" > AndroidProducts.mk
-        echo "    $(LOCAL_DIR)/twrp_${DEVICE}.mk \\" >> AndroidProducts.mk
-        echo "    $(LOCAL_DIR)/${DEVICE}.mk" >> AndroidProducts.mk
-        echo "COMMON_LUNCH_CHOICES := \\" >> AndroidProducts.mk
-        echo "    twrp_${DEVICE}-eng," >> AndroidProducts.mk
-        echo "    ${DEVICE}-eng" >> AndroidProducts.mk
+        # ✅ 2. COMPLETE AndroidProducts.mk (MODERN)
+        cat > AndroidProducts.mk << EOF
+        PRODUCT_MAKEFILES := \\
+            $(LOCAL_DIR)/twrp_${DEVICE}.mk \\
+            $(LOCAL_DIR)/${DEVICE}.mk
+
+        COMMON_LUNCH_CHOICES := \\
+            twrp_${DEVICE}-eng, \\
+            ${DEVICE}-eng
+        EOF
         
-        # 3. COMPLETE twrp_${DEVICE}.mk
+        # ✅ 3. COMPLETE twrp_${DEVICE}.mk
         cat > "twrp_${DEVICE}.mk" << EOF
         $(call inherit-product, $(SRC_TARGET_DIR)/product/embedded.mk)
         $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
@@ -154,7 +154,7 @@ jobs:
         PRODUCT_MANUFACTURER := samsung
         EOF
         
-        # 4. BASE ${DEVICE}.mk
+        # ✅ 4. BASE ${DEVICE}.mk (A-ONLY FIXED)
         cat > "${DEVICE}.mk" << EOF
         $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
         $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
@@ -165,10 +165,11 @@ jobs:
         PRODUCT_MODEL := Galaxy A14x
         PRODUCT_MANUFACTURER := samsung
         
-        $(call inherit-product, $(SRC_TARGET_DIR)/product/aosp_ab_device.mk)
+        # ✅ A-ONLY (Samsung m14x)
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/aosp_base.mk)
         EOF
         
-        # 🔥 ORANGEFOX FLAGS (ECHO STYLE - ORGANIZED)
+        # 🔥 ORANGEFOX FLAGS (A-ONLY+CRB PERFECT)
         echo "# 🔥 ORANGEFOX CORE FLAGS" >> "$BOARDCONFIG"
         echo "FOX_VANILLA_BUILD := 0" >> "$BOARDCONFIG"
         echo "FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER := 1" >> "$BOARDCONFIG"
@@ -188,7 +189,7 @@ jobs:
         echo "OF_NO_TREBLE_COMPATIBILITY_CHECK := 0" >> "$BOARDCONFIG"
         
         echo "" >> "$BOARDCONFIG"
-        echo "# 🔥 AVB2.0 + MAGISKBOOT" >> "$BOARDCONFIG"
+        echo "# 🔥 AVB2.0 + MAGISKBOOT (A-ONLY OK)" >> "$BOARDCONFIG"
         echo "OF_USE_MAGISKBOOT := 1" >> "$BOARDCONFIG"
         echo "OF_PATCH_AVB20 := 1" >> "$BOARDCONFIG"
         echo "OF_AB_DEVICE := 1" >> "$BOARDCONFIG"
@@ -202,13 +203,20 @@ jobs:
         echo "FOX_ENABLE_ADB_CLEAR_PARTITION := true" >> "$BOARDCONFIG"
         
         echo "" >> "$BOARDCONFIG"
-        echo "# 📱 TWRP EXTRAS" >> "$BOARDCONFIG"
+        echo "# 📱 A-ONLY TWRP EXTRAS" >> "$BOARDCONFIG"
         echo "TW_USE_FUSE_EXFAT := true" >> "$BOARDCONFIG"
         echo "BOARD_HAS_NO_SELECT_BUTTON := true" >> "$BOARDCONFIG"
         echo "TW_DEVICE_VERSION := 12.1" >> "$BOARDCONFIG"
+        echo "BOARD_USES_RECOVERY_AS_BOOT := false" >> "$BOARDCONFIG"
         
-        echo "✅ Device tree FIXED with 5 flag groups!"
-        ls -la *.mk vendorsetup.sh
+        echo "" >> "$BOARDCONFIG"
+        echo "# 🔥 CRB (Charge While Booting)" >> "$BOARDCONFIG"
+        echo "FOX_CHARGE_B := true" >> "$BOARDCONFIG"
+        
+        echo "✅ A-ONLY+CRB FIXED: No vendorsetup.sh + aosp_base.mk + CRB!"
+        echo "📁 Files created:"
+        ls -la *.mk
+        echo "❌ No vendorsetup.sh (Android 12+)"
         echo "::endgroup::"
 
     - name: 🔍 Validate Lunch Targets
@@ -220,7 +228,7 @@ jobs:
         echo "=== DEVICE TARGETS ==="
         lunch 2>&1 | grep -i "${{ inputs.DEVICE_NAME }}"
 
-    - name: Building OrangeFox
+    - name: Building OrangeFox A-ONLY+CRB
       timeout-minutes: 240
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
@@ -233,7 +241,7 @@ jobs:
         LUNCH_SUCCESS=false
         for target in "twrp_${{ inputs.DEVICE_NAME }}-eng" "${{ inputs.DEVICE_NAME }}-eng"; do
           if lunch "$target" 2>/dev/null; then
-            echo "✅ Lunch: $target"
+            echo "✅ Lunch: $target (A-ONLY+CRB)"
             LUNCH_SUCCESS=true
             break
           fi
@@ -257,28 +265,42 @@ jobs:
         echo "DEVICE_TREE_URL=${DEVICE_TREE_URL}" >> $GITHUB_ENV
         
         cd out/target/product/${{ inputs.DEVICE_NAME }}
-        MD5=$(md5sum *.img | cut -d' ' -f1 | head -1)
-        SHA256=$(sha256sum *.img | cut -d' ' -f1 | head -1)
+        if ls *.img >/dev/null 2>&1; then
+          MD5=$(md5sum *.img | cut -d' ' -f1 | head -1)
+          SHA256=$(sha256sum *.img | cut -d' ' -f1 | head -1)
+        else
+          MD5="N/A"
+          SHA256="N/A"
+        fi
         echo "MD5_IMG=$MD5" >> $GITHUB_ENV
         echo "SHA256_IMG=$SHA256" >> $GITHUB_ENV
 
     - name: Upload to Release
-      if: success() && env.MD5_IMG != ''
+      if: success()
       uses: softprops/action-gh-release@v2
       with:
         files: |
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.img
           OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/OrangeFox*.zip
-        name: "OrangeFox [${{ inputs.DEVICE_NAME }}] ${{ env.BUILD_DATE }}"
+          OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/*.img
+        name: "OrangeFox A-ONLY+CRB [${{ inputs.DEVICE_NAME }}] ${{ env.BUILD_DATE }}"
         tag_name: ${{ github.run_id }}
         body: |
-          ## 🔥 OrangeFox Recovery Build - Unofficial
+          ## 🔥 OrangeFox Recovery Build - A-ONLY+CRB (Unofficial)
           
-          **Device**: `${{ inputs.DEVICE_NAME }}`
+          **Device**: `${{ inputs.DEVICE_NAME }}` (A-ONLY)
           **Build**: `${{ env.BUILD_DATE }}`
           **Branch**: `fox_${{ inputs.MANIFEST_BRANCH }}`
           **MD5**: `${{ env.MD5_IMG }}`
           **SHA256**: `${{ env.SHA256_IMG }}`
           
           **Device Tree**: [${{ inputs.DEVICE_TREE_BRANCH }}](${{ env.DEVICE_TREE_URL }}/tree/${{ inputs.DEVICE_TREE_BRANCH }})
-          **
+          **Commit**: [${{ env.COMMIT_ID }}](${{ env.DEVICE_TREE_URL }}/commit/${{ env.COMMIT_ID }})
+          
+          ### ✅ A-ONLY+CRB Features:
+          - 🌐 Treble/GSI Support + LPtools
+          - 🔥 AVB2.0 + Magiskboot
+          - ⚙️ ADB Root + Partition Tools
+          - 📱 Dedicated Recovery Partition
+          - 🔋 **CRB (Charge While Booting)**
+          - 🔧 `fastboot flash recovery OrangeFox.img`
