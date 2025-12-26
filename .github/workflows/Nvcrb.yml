@@ -157,15 +157,7 @@ jobs:
         head -10 build/envsetup.sh || true
         echo "::endgroup::"
 
-    # 🔥 RE-SYNC IF NEEDED (NEW - ENSURES COMPLETE SOURCE)
-    - name: Force Repo Sync
-      run: |
-        echo "::group::🔄 FORCING REPO SYNC"
-        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        repo init -u https://gitlab.com/OrangeFox/manifest.git -b ${{ inputs.MANIFEST_BRANCH }} --depth=1 || true
-        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags || true
-        echo "✅ Repo sync complete"
-        echo "::endgroup::"
+
 
     # 🔥 ENHANCED BUILD WITH FULL DEBUG + FALLBACK
     - name: Building OrangeFox NON-VANILLA
