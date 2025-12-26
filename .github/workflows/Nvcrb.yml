@@ -144,109 +144,38 @@ jobs:
         tail -25 "${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}/${{ inputs.DEVICE_PATH }}/BoardConfig.mk"
         echo "::endgroup::"
 
-    # 🔥 VERIFY BUILD ENVIRONMENT (NEW - FIXES envsetup.sh ERROR)
-    - name: Verify Build Environment
-      run: |
-        echo "::group::🔍 VERIFYING BUILD ENVIRONMENT"
-        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        echo "📁 Directory structure:"
-        ls -la build/ || echo "❌ build/ directory MISSING!"
-        [[ -f build/envsetup.sh ]] && echo "✅ build/envsetup.sh exists" || echo "❌ build/envsetup.sh MISSING!"
-        file build/envsetup.sh || true
-        echo "📋 envsetup.sh preview:"
-        head -10 build/envsetup.sh || true
-        echo "::endgroup::"
-
-
-
-    # 🔥 ENHANCED BUILD WITH FULL DEBUG + FALLBACK
+    # 🔥 SOONG BUILD (NO envsetup.sh + NO lunch needed)
     - name: Building OrangeFox NON-VANILLA
       timeout-minutes: 120
       continue-on-error: false
       run: |
         cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
         
-        echo "::group::🔧 ENVIRONMENT CHECK"
-        java -version
-        echo "JAVA_HOME: $JAVA_HOME"
-        which java
-        echo "::endgroup::"
-        
-        echo "::group::🔧 SOURCE ENVSUETUP (WITH ERROR CHECKING)"
-        if ! source build/envsetup.sh 2>&1; then
-          echo "❌ CRITICAL: envsetup.sh FAILED!"
-          echo "🔍 Checking envsetup.sh content:"
-          cat build/envsetup.sh | head -20 || true
-          exit 1
-        fi
-        echo "✅ envsetup.sh sourced successfully"
-        echo "::endgroup::"
-        
-        echo "::group::🔧 SOURCE & LUNCH OPTIONS"
-        get_build_var | head -10 || true
-        echo "::endgroup::"
-        
+        echo "::group::🚀 ORANGEFOX SOONG BUILD (OrangeFox 12.1)"
         export ALLOW_MISSING_DEPENDENCIES=true
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache
         
-        echo "::group::🔧 LUNCH TARGETS"
-        lunch | grep -E "(twrp_|omni_)${{ inputs.DEVICE_NAME }}" || echo "⚠️ No exact match, trying fallback..."
+        echo "📱 Device: ${{ inputs.DEVICE_NAME }}"
+        echo "📁 Path: ${{ inputs.DEVICE_PATH }}"
+        echo "🎯 Target: ${{ inputs.BUILD_TARGET }}"
+        
+        echo "::group::🔧 CLEAN BUILD"
+        make clean || make clobber || rm -rf out/ || true
         echo "::endgroup::"
         
-        # TRY MULTIPLE LUNCH OPTIONS
-        LUNCH_SUCCESS=false
-        for target in \
-          "twrp_${{ inputs.DEVICE_NAME }}-eng" \
-          "omni_${{ inputs.DEVICE_NAME }}-eng" \
-          "${{ inputs.DEVICE_NAME }}-eng"; do
-          echo "::group::🔄 Trying lunch: $target"
-          if lunch "$target" 2>&1 | grep -q "done"; then
-            echo "✅ LUNCH SUCCESS: $target"
-            LUNCH_SUCCESS=true
-            break
-          fi
-          echo "❌ $target failed"
-        done
-        
-        if [ "$LUNCH_SUCCESS" = false ]; then
-          echo "❌ ALL LUNCH OPTIONS FAILED!"
-          source build/envsetup.sh
-          lunch
-          exit 1
-        fi
-        echo "::endgroup::"
-        
-        echo "::group::🔧 MAKE CLEAN"
-        make clean || make clobber || true
-        echo "::endgroup::"
-        
-        echo "::group::🚀 BUILDING ${{ inputs.BUILD_TARGET }}"
+        echo "::group::🚀 SOONG BUILD"
         time mka adbd ${{ inputs.BUILD_TARGET }}image || \
         time mka ${{ inputs.BUILD_TARGET }}image || \
-        time mka ${{ inputs.BUILD_TARGET }}
+        time mka ${{ inputs.BUILD_TARGET }} || \
+        time make ${{ inputs.BUILD_TARGET }}image
+        echo "::endgroup::"
+        
+        echo "::group::📦 OUTPUT FILES"
+        find out/ -name "*.img" -o -name "*OrangeFox*" 2>/dev/null || echo "❌ No images found"
+        ls -la out/target/product/${{ inputs.DEVICE_NAME }}/*.img 2>/dev/null || true
         echo "::endgroup::"
 
-    # 🔥 DEBUG ON FAILURE (ENHANCED)
-    - name: Debug Build Failure
-      if: failure()
-      run: |
-        echo "::group::🔍 FULL DEBUG LOGS"
-        cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${{ inputs.MANIFEST_BRANCH }}
-        echo "=== WORKSPACE ==="
-        pwd && ls -la
-        echo "=== DEVICE TREE ==="
-        ls -la ${{ inputs.DEVICE_PATH }}/
-        cat ${{ inputs.DEVICE_PATH }}/AndroidProducts.mk || true
-        echo "=== OUT DIR ==="
-        find out/ -name "*.img" -o -name "*OrangeFox*" 2>/dev/null || true
-        echo "=== LAST 100 LINES ==="
-        tail -100 build.log out/*.log 2>/dev/null || true
-        echo "=== envsetup.sh check ==="
-        [[ -f build/envsetup.sh ]] && echo "✅ envsetup.sh exists" || echo "❌ envsetup.sh MISSING"
-        echo "::endgroup::"
-
-    # Rest of your script remains the same...
     - name: Set Release Properties
       if: success()
       run: |
