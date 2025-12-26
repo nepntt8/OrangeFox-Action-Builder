@@ -93,7 +93,7 @@ jobs:
         echo "::group::🔧 Cloning Essential Build Tools"
         rm -rf scripts build_tools
         git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master scripts
-        git clone https://github.com/TeamWin/android_build.git -b fox_12.1 build_tools
+        git clone https://github.com/TeamWin/android_build.git build_tools
         echo "::endgroup::"
 
     - name: Set-up Manifest
