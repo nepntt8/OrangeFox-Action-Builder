@@ -269,5 +269,3 @@ jobs:
           
           ---
           *Built with ❤️ by ${{ github.actor }}*
-
-Would you like me to add any specific GSI testing steps or modify the dynamic property detection for particular GSI variants?
