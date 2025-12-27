@@ -19,7 +19,7 @@ on:
       DEVICE_TREE:
         description: 'OrangeFox Device Tree 📱'
         required: true
-        default: 'https://github.com/nepntt8/Makeit2android_device_samsung_m14x'
+        default: 'https://github.com/TeamWin/android_device_samsung_m14x.git'
       DEVICE_TREE_BRANCH:
         description: 'OrangeFox Device Tree Branch 🌿'
         required: true
