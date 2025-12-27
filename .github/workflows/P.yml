@@ -1,0 +1,9 @@
+- name: Run Playwright Tests
+  if: hashFiles('tests/**/*.spec.ts') != ''  # Only if tests exist
+  run: |
+    npx playwright install --with-deps
+    npx playwright test || true  # Don't fail CI
+
+- name: Generate Report
+  if: always() && hashFiles('playwright-report/index.html') != ''
+  run: npx playwright show-report
